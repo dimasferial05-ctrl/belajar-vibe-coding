@@ -54,4 +54,36 @@ describe("User Registration (POST /api/users)", () => {
 
     expect(res.status).toBe(422);
   });
+
+  it("validasi gagal ketika input name melebihi 255 karakter (Status 422)", async () => {
+    const res = await app.handle(
+      new Request("http://localhost/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "A".repeat(300),
+          email: "valid@localhost",
+          password: "rahasia",
+        }),
+      })
+    );
+
+    expect(res.status).toBe(422);
+  });
+
+  it("validasi gagal ketika input email melebihi 255 karakter (Status 422)", async () => {
+    const res = await app.handle(
+      new Request("http://localhost/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: "Dimas",
+          email: `${"a".repeat(250)}@localhost.com`,
+          password: "rahasia",
+        }),
+      })
+    );
+
+    expect(res.status).toBe(422);
+  });
 });

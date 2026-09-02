@@ -102,4 +102,19 @@ describe("User Login Feature (POST /api/users/login)", () => {
 
     expect(res.status).toBe(422);
   });
+
+  it("validasi gagal jika input login melebihi 255 karakter (Status 422)", async () => {
+    const res = await app.handle(
+      new Request("http://localhost/api/users/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: `${"a".repeat(250)}@localhost.com`,
+          password: "rahasia",
+        }),
+      })
+    );
+
+    expect(res.status).toBe(422);
+  });
 });
