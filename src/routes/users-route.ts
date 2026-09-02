@@ -36,6 +36,16 @@ export const usersRoute = new Elysia({ prefix: "/api/users" })
         email: t.String({ minLength: 1, maxLength: 255 }),
         password: t.String({ minLength: 1, maxLength: 255 }),
       }),
+      detail: {
+        summary: "Registrasi User Baru",
+        description: "Mendaftarkan user baru ke dalam database dan menghash password",
+        tags: ["Users"],
+        responses: {
+          200: { description: "Berhasil registrasi" },
+          400: { description: "Email sudah terdaftar" },
+          422: { description: "Validasi body gagal" },
+        },
+      },
     }
   )
   .post(
@@ -48,6 +58,16 @@ export const usersRoute = new Elysia({ prefix: "/api/users" })
         email: t.String({ minLength: 1, maxLength: 255 }),
         password: t.String({ minLength: 1, maxLength: 255 }),
       }),
+      detail: {
+        summary: "Login User",
+        description: "Autentikasi pengguna dan mengembalikan session token (UUID)",
+        tags: ["Users"],
+        responses: {
+          200: { description: "Berhasil login dan mendapatkan token" },
+          400: { description: "Email atau password salah" },
+          422: { description: "Validasi body gagal" },
+        },
+      },
     }
   )
   .guard(
@@ -69,10 +89,38 @@ export const usersRoute = new Elysia({ prefix: "/api/users" })
           const token = headers.authorization!.substring(7).trim();
           return { token };
         })
-        .get("/current", async ({ token }) => {
-          return await getCurrentUser(token);
-        })
-        .delete("/logout", async ({ token }) => {
-          return await logoutUser(token);
-        })
+        .get(
+          "/current",
+          async ({ token }) => {
+            return await getCurrentUser(token);
+          },
+          {
+            detail: {
+              summary: "Dapatkan Data Pengguna Saat Ini",
+              description: "Mengambil profil pengguna yang sedang login berdasarkan token Bearer",
+              tags: ["Users"],
+              responses: {
+                200: { description: "Berhasil mendapatkan profil user" },
+                401: { description: "Unauthorized (token tidak valid atau tidak ada)" },
+              },
+            },
+          }
+        )
+        .delete(
+          "/logout",
+          async ({ token }) => {
+            return await logoutUser(token);
+          },
+          {
+            detail: {
+              summary: "Logout User",
+              description: "Mengakhiri sesi dengan menghapus session token dari database",
+              tags: ["Users"],
+              responses: {
+                200: { description: "Berhasil logout" },
+                401: { description: "Unauthorized (token tidak valid atau tidak ada)" },
+              },
+            },
+          }
+        )
   );
