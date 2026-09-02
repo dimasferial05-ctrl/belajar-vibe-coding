@@ -38,7 +38,7 @@ describe("User Login Feature (POST /api/users/login)", () => {
     );
 
     expect(res.status).toBe(200);
-    const body = await res.json();
+    const body: any = await res.json();
     expect(body.data).toBeString();
     // UUID v4 format regex
     expect(body.data).toMatch(
@@ -51,7 +51,7 @@ describe("User Login Feature (POST /api/users/login)", () => {
       .from(sessions)
       .where(eq(sessions.token, body.data));
     expect(savedSession).toBeDefined();
-    expect(savedSession.token).toBe(body.data);
+    expect(savedSession?.token).toBe(body.data);
   });
 
   it("gagal login jika password salah (Status 400 & Error message)", async () => {
