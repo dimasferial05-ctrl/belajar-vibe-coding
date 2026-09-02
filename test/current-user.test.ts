@@ -1,30 +1,33 @@
-import { describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 import { Elysia } from "elysia";
 import { usersRoute } from "../src/routes/users-route";
+import { clearDatabase } from "./test-helper";
 
 const app = new Elysia().use(usersRoute);
 
 describe("Get Current User Feature (GET /api/users/current)", () => {
   const testUser = {
-    name: "Dimas",
-    email: `current_user_test_${Date.now()}@localhost`,
-    password: "rahasia",
+    name: "Dimas Current Test",
+    email: "dimas_current@localhost",
+    password: "passwordValid123",
   };
 
   let validToken = "";
 
-  it("mempersiapkan user baru dan login untuk mendapatkan token", async () => {
-    // 1. Register user
-    const regRes = await app.handle(
+  beforeEach(async () => {
+    // Hapus data terlebih dahulu sebelum setiap skenario agar konsisten
+    await clearDatabase();
+
+    // 1. Registrasikan user baru
+    await app.handle(
       new Request("http://localhost/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(testUser),
       })
     );
-    expect(regRes.status).toBe(200);
 
-    // 2. Login user
+    // 2. Login untuk mendapatkan token session
     const loginRes = await app.handle(
       new Request("http://localhost/api/users/login", {
         method: "POST",
@@ -35,9 +38,7 @@ describe("Get Current User Feature (GET /api/users/current)", () => {
         }),
       })
     );
-    expect(loginRes.status).toBe(200);
     const loginBody: any = await loginRes.json();
-    expect(loginBody.data).toBeString();
     validToken = loginBody.data;
   });
 
@@ -58,7 +59,7 @@ describe("Get Current User Feature (GET /api/users/current)", () => {
     expect(body.data.email).toBe(testUser.email);
     expect(body.data.id).toBeNumber();
     expect(body.data.created_at).toBeDefined();
-    expect(body.data.password).toBeUndefined(); // Password tidak boleh bocor
+    expect(body.data.password).toBeUndefined(); // Keamanan: password tidak boleh diekspos
   });
 
   it("gagal (Status 401 Unauthorized) jika request tanpa header Authorization", async () => {
@@ -73,12 +74,12 @@ describe("Get Current User Feature (GET /api/users/current)", () => {
     expect(body).toEqual({ error: "Unauthorized" });
   });
 
-  it("gagal (Status 401 Unauthorized) jika token salah atau tidak ditemukan", async () => {
+  it("gagal (Status 401 Unauthorized) jika format Authorization bukan Bearer", async () => {
     const res = await app.handle(
       new Request("http://localhost/api/users/current", {
         method: "GET",
         headers: {
-          Authorization: "Bearer token-palsu-12345",
+          Authorization: `Basic ${validToken}`,
         },
       })
     );
@@ -88,12 +89,27 @@ describe("Get Current User Feature (GET /api/users/current)", () => {
     expect(body).toEqual({ error: "Unauthorized" });
   });
 
-  it("gagal (Status 401 Unauthorized) jika format Authorization bukan Bearer", async () => {
+  it("gagal (Status 401 Unauthorized) jika header Authorization hanya 'Bearer ' tanpa token", async () => {
     const res = await app.handle(
       new Request("http://localhost/api/users/current", {
         method: "GET",
         headers: {
-          Authorization: `Basic ${validToken}`,
+          Authorization: "Bearer ",
+        },
+      })
+    );
+
+    expect(res.status).toBe(401);
+    const body: any = await res.json();
+    expect(body).toEqual({ error: "Unauthorized" });
+  });
+
+  it("gagal (Status 401 Unauthorized) jika token salah atau tidak ditemukan di database", async () => {
+    const res = await app.handle(
+      new Request("http://localhost/api/users/current", {
+        method: "GET",
+        headers: {
+          Authorization: "Bearer token-palsu-tidak-ada-di-db",
         },
       })
     );
