@@ -14,6 +14,15 @@ const app = new Elysia()
           version: "1.0.0",
           description: "Dokumentasi API untuk aplikasi autentikasi pengguna",
         },
+        components: {
+          securitySchemes: {
+            bearerAuth: {
+              type: "http",
+              scheme: "bearer",
+              bearerFormat: "UUID",
+            },
+          },
+        },
         tags: [
           { name: "Users", description: "Endpoint untuk autentikasi dan manajemen user" },
         ],
