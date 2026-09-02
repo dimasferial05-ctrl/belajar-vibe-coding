@@ -1,33 +1,36 @@
-import { describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
 import { Elysia } from "elysia";
 import { eq } from "drizzle-orm";
 import { db } from "../src/db";
 import { sessions } from "../src/db/schema";
 import { usersRoute } from "../src/routes/users-route";
+import { clearDatabase } from "./test-helper";
 
 const app = new Elysia().use(usersRoute);
 
 describe("User Logout Feature (DELETE /api/users/logout)", () => {
   const testUser = {
-    name: "Dimas Logout",
-    email: `logout_test_${Date.now()}@localhost`,
-    password: "rahasia",
+    name: "Dimas Logout Test",
+    email: "dimas_logout@localhost",
+    password: "passwordValid123",
   };
 
   let validToken = "";
 
-  it("mempersiapkan user baru dan login untuk mendapatkan session token", async () => {
-    // 1. Register user
-    const regRes = await app.handle(
+  beforeEach(async () => {
+    // Hapus data terlebih dahulu sebelum setiap skenario agar konsisten
+    await clearDatabase();
+
+    // 1. Registrasi user
+    await app.handle(
       new Request("http://localhost/api/users", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(testUser),
       })
     );
-    expect(regRes.status).toBe(200);
 
-    // 2. Login user
+    // 2. Login user untuk mendapatkan session token
     const loginRes = await app.handle(
       new Request("http://localhost/api/users/login", {
         method: "POST",
@@ -38,17 +41,8 @@ describe("User Logout Feature (DELETE /api/users/logout)", () => {
         }),
       })
     );
-    expect(loginRes.status).toBe(200);
     const loginBody: any = await loginRes.json();
-    expect(loginBody.data).toBeString();
     validToken = loginBody.data;
-
-    // Pastikan session tersimpan di DB
-    const [savedSession] = await db
-      .select()
-      .from(sessions)
-      .where(eq(sessions.token, validToken));
-    expect(savedSession).toBeDefined();
   });
 
   it("berhasil logout dengan token valid (Status 200 & data: OK)", async () => {
@@ -65,7 +59,7 @@ describe("User Logout Feature (DELETE /api/users/logout)", () => {
     const body: any = await res.json();
     expect(body).toEqual({ data: "OK" });
 
-    // Pastikan session sudah terhapus dari tabel sessions di DB
+    // Pastikan session sudah terhapus dari database
     const [deletedSession] = await db
       .select()
       .from(sessions)
@@ -74,7 +68,19 @@ describe("User Logout Feature (DELETE /api/users/logout)", () => {
   });
 
   it("token yang sudah di-logout tidak bisa digunakan lagi untuk GET /api/users/current (Status 401)", async () => {
-    const res = await app.handle(
+    // 1. Lakukan logout terlebih dahulu
+    const logoutRes = await app.handle(
+      new Request("http://localhost/api/users/logout", {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${validToken}`,
+        },
+      })
+    );
+    expect(logoutRes.status).toBe(200);
+
+    // 2. Coba akses endpoint GET /api/users/current dengan token yang sama
+    const currentRes = await app.handle(
       new Request("http://localhost/api/users/current", {
         method: "GET",
         headers: {
@@ -83,12 +89,23 @@ describe("User Logout Feature (DELETE /api/users/logout)", () => {
       })
     );
 
-    expect(res.status).toBe(401);
-    const body: any = await res.json();
-    expect(body).toEqual({ error: "Unauthorized" });
+    expect(currentRes.status).toBe(401);
+    const currentBody: any = await currentRes.json();
+    expect(currentBody).toEqual({ error: "Unauthorized" });
   });
 
   it("gagal logout ulang jika token sudah dihapus / tidak valid (Status 401)", async () => {
+    // 1. Logout pertama kali
+    await app.handle(
+      new Request("http://localhost/api/users/logout", {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${validToken}`,
+        },
+      })
+    );
+
+    // 2. Logout kedua kali dengan token yang sama
     const res = await app.handle(
       new Request("http://localhost/api/users/logout", {
         method: "DELETE",
@@ -121,6 +138,21 @@ describe("User Logout Feature (DELETE /api/users/logout)", () => {
         method: "DELETE",
         headers: {
           Authorization: "Basic token-palsu",
+        },
+      })
+    );
+
+    expect(res.status).toBe(401);
+    const body: any = await res.json();
+    expect(body).toEqual({ error: "Unauthorized" });
+  });
+
+  it("gagal (Status 401 Unauthorized) jika header Authorization hanya 'Bearer ' tanpa token", async () => {
+    const res = await app.handle(
+      new Request("http://localhost/api/users/logout", {
+        method: "DELETE",
+        headers: {
+          Authorization: "Bearer ",
         },
       })
     );
