@@ -27,6 +27,13 @@ export class InvalidCredentialsError extends Error {
   }
 }
 
+export class UnauthorizedError extends Error {
+  constructor(message = "Unauthorized") {
+    super(message);
+    this.name = "UnauthorizedError";
+  }
+}
+
 export async function registerUser(input: RegisterUserInput) {
   const existingUsers = await db
     .select()
@@ -76,4 +83,24 @@ export async function loginUser(input: LoginUserInput) {
   });
 
   return { data: token };
+}
+
+export async function getCurrentUser(token: string) {
+  const [result] = await db
+    .select({
+      id: users.id,
+      name: users.name,
+      email: users.email,
+      created_at: users.createdAt,
+    })
+    .from(sessions)
+    .innerJoin(users, eq(sessions.userId, users.id))
+    .where(eq(sessions.token, token))
+    .limit(1);
+
+  if (!result) {
+    throw new UnauthorizedError("Unauthorized");
+  }
+
+  return { data: result };
 }
