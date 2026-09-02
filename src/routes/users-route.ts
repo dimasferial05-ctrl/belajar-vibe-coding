@@ -10,20 +10,25 @@ import {
 } from "../services/users-service";
 
 export const usersRoute = new Elysia({ prefix: "/api/users" })
+  .error({
+    UNAUTHORIZED: UnauthorizedError,
+    USER_ALREADY_EXISTS: UserAlreadyExistsError,
+    INVALID_CREDENTIALS: InvalidCredentialsError,
+  })
+  .onError(({ code, error, set }) => {
+    if (code === "UNAUTHORIZED") {
+      set.status = 401;
+      return { error: error.message };
+    }
+    if (code === "USER_ALREADY_EXISTS" || code === "INVALID_CREDENTIALS") {
+      set.status = 400;
+      return { error: error.message };
+    }
+  })
   .post(
     "/",
-    async ({ body, set }) => {
-      try {
-        const result = await registerUser(body);
-        return result;
-      } catch (error: any) {
-        if (error instanceof UserAlreadyExistsError) {
-          set.status = 400;
-          return { error: error.message };
-        }
-        set.status = 500;
-        return { error: error.message || "Internal server error" };
-      }
+    async ({ body }) => {
+      return await registerUser(body);
     },
     {
       body: t.Object({
@@ -35,18 +40,8 @@ export const usersRoute = new Elysia({ prefix: "/api/users" })
   )
   .post(
     "/login",
-    async ({ body, set }) => {
-      try {
-        const result = await loginUser(body);
-        return result;
-      } catch (error: any) {
-        if (error instanceof InvalidCredentialsError) {
-          set.status = 400;
-          return { error: error.message };
-        }
-        set.status = 500;
-        return { error: error.message || "Internal server error" };
-      }
+    async ({ body }) => {
+      return await loginUser(body);
     },
     {
       body: t.Object({
@@ -55,53 +50,29 @@ export const usersRoute = new Elysia({ prefix: "/api/users" })
       }),
     }
   )
-  .get("/current", async ({ headers, set }) => {
-    try {
-      const authHeader = headers.authorization;
-      if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        set.status = 401;
-        return { error: "Unauthorized" };
-      }
-
-      const token = authHeader.substring(7).trim();
-      if (!token) {
-        set.status = 401;
-        return { error: "Unauthorized" };
-      }
-
-      const result = await getCurrentUser(token);
-      return result;
-    } catch (error: any) {
-      if (error instanceof UnauthorizedError) {
-        set.status = 401;
-        return { error: error.message };
-      }
-      set.status = 500;
-      return { error: error.message || "Internal server error" };
-    }
-  })
-  .delete("/logout", async ({ headers, set }) => {
-    try {
-      const authHeader = headers.authorization;
-      if (!authHeader || !authHeader.startsWith("Bearer ")) {
-        set.status = 401;
-        return { error: "Unauthorized" };
-      }
-
-      const token = authHeader.substring(7).trim();
-      if (!token) {
-        set.status = 401;
-        return { error: "Unauthorized" };
-      }
-
-      const result = await logoutUser(token);
-      return result;
-    } catch (error: any) {
-      if (error instanceof UnauthorizedError) {
-        set.status = 401;
-        return { error: error.message };
-      }
-      set.status = 500;
-      return { error: error.message || "Internal server error" };
-    }
-  });
+  .guard(
+    {
+      beforeHandle: ({ headers }) => {
+        const authHeader = headers.authorization;
+        if (!authHeader || !authHeader.startsWith("Bearer ")) {
+          throw new UnauthorizedError("Unauthorized");
+        }
+        const token = authHeader.substring(7).trim();
+        if (!token) {
+          throw new UnauthorizedError("Unauthorized");
+        }
+      },
+    },
+    (app) =>
+      app
+        .resolve(({ headers }) => {
+          const token = headers.authorization!.substring(7).trim();
+          return { token };
+        })
+        .get("/current", async ({ token }) => {
+          return await getCurrentUser(token);
+        })
+        .delete("/logout", async ({ token }) => {
+          return await logoutUser(token);
+        })
+  );

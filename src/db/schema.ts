@@ -13,7 +13,7 @@ export type NewUser = typeof users.$inferInsert;
 
 export const sessions = mysqlTable("sessions", {
   id: int("id").primaryKey().autoincrement(),
-  token: varchar("token", { length: 255 }).notNull(),
+  token: varchar("token", { length: 255 }).notNull().unique(),
   userId: int("user_id")
     .notNull()
     .references(() => users.id),
