@@ -8,6 +8,13 @@
       "when": 1788250759032,
       "tag": "0000_watery_shiver_man",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1788313371957,
+      "tag": "0001_small_radioactive_man",
+      "breakpoints": true
     }
   ]
 }
